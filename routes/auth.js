@@ -6,6 +6,30 @@ import auth from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
+function buildAuthPayload(user) {
+  return {
+    id: user._id.toString(),
+    name: user.name,
+    surname: user.surname,
+    phone: user.phone,
+    username: user.username || null,
+    role: user.role,
+    clinic: user.clinic ? user.clinic.toString() : null,
+  };
+}
+
+function signTokenForUser(user) {
+  return jwt.sign(
+    {
+      id: user._id.toString(),
+      role: user.role || "user",
+      clinic: user.clinic ? user.clinic.toString() : null,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
 router.post("/signup", async (req, res) => {
   const { name, surname, phone, password } = req.body;
 
@@ -56,6 +80,12 @@ router.post("/login", async (req, res) => {
         .json({ message: "Telefon numarası veya şifre hatalı." });
     }
 
+    if ((user.role || "user") === "vet") {
+      return res.status(403).json({
+        message: "Veteriner klinik hesabı için klinik giriş ekranını kullanın.",
+      });
+    }
+
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
       return res
@@ -63,31 +93,57 @@ router.post("/login", async (req, res) => {
         .json({ message: "Telefon numarası veya şifre hatalı." });
     }
 
-    const token = jwt.sign(
-      {
-        id: user._id.toString(),
-        role: user.role || "user",
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" } 
-    );
+    const token = signTokenForUser(user);
 
     console.log("Login başarılı, user id:", user._id.toString());
 
     res.status(200).json({
       message: "Giriş başarılı.",
       token,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        surname: user.surname,
-        phone: user.phone,
-        role: user.role,
-      },
+      user: buildAuthPayload(user),
     });
   } catch (error) {
     console.log("Giriş yapılırken hata oluştu:", error);
     res.status(500).json({ message: "Sunucu hatası", error });
+  }
+});
+
+router.post("/vet/login", async (req, res) => {
+  const username = req.body.username?.trim().toLowerCase();
+  const password = req.body.password;
+
+  if (!username || !password) {
+    return res.status(400).json({ message: "Kullanıcı adı ve şifre gerekli." });
+  }
+
+  try {
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(401).json({ message: "Kullanıcı adı veya şifre hatalı." });
+    }
+
+    if ((user.role || "user") !== "vet") {
+      return res.status(403).json({
+        message: "Bu hesap veteriner klinik girişi için yetkili değil.",
+      });
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordMatch) {
+      return res.status(401).json({ message: "Kullanıcı adı veya şifre hatalı." });
+    }
+
+    const token = signTokenForUser(user);
+
+    return res.status(200).json({
+      message: "Veteriner klinik girişi başarılı.",
+      token,
+      user: buildAuthPayload(user),
+    });
+  } catch (error) {
+    console.log("Vet login error:", error);
+    return res.status(500).json({ message: "Sunucu hatası" });
   }
 });
 
@@ -108,13 +164,7 @@ router.get("/profile", auth, async (req, res) => {
       return res.status(404).json({ message: "Kullanıcı bulunamadı." });
     }
 
-    return res.status(200).json({
-      id: user._id.toString(),
-      name: user.name,
-      surname: user.surname,
-      phone: user.phone,
-      role: user.role,
-    });
+    return res.status(200).json(buildAuthPayload(user));
   } catch (error) {
     console.error("Profile route error:", error);
     return res.status(500).json({
@@ -156,13 +206,7 @@ router.put("/profile", auth, async (req, res) => {
 
     return res.status(200).json({
       message: "Profil başarıyla güncellendi.",
-      user: {
-        id: updated._id.toString(),
-        name: updated.name,
-        surname: updated.surname,
-        phone: updated.phone,
-        role: updated.role,
-      },
+      user: buildAuthPayload(updated),
     });
   } catch (error) {
     console.error("Profile update error:", error);
@@ -197,22 +241,12 @@ router.post("/admin/login", async (req, res) => {
       return res.status(403).json({ message: "Bu panele erişim yetkiniz yok." });
     }
 
-    const token = jwt.sign(
-      { id: user._id.toString(), role: user.role || "user" },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signTokenForUser(user);
 
     return res.status(200).json({
       message: "Admin giriş başarılı.",
       token,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        surname: user.surname,
-        phone: user.phone,
-        role: user.role,
-      },
+      user: buildAuthPayload(user),
     });
   } catch (error) {
     console.log("Admin login error:", error);
