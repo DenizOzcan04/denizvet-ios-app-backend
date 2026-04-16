@@ -5,13 +5,14 @@ import express from "express";
 import auth from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function buildAuthPayload(user) {
   return {
     id: user._id.toString(),
     name: user.name,
     surname: user.surname,
-    phone: user.phone,
+    email: user.email || null,
     username: user.username || null,
     role: user.role,
     clinic: user.clinic ? user.clinic.toString() : null,
@@ -31,22 +32,27 @@ function signTokenForUser(user) {
 }
 
 router.post("/signup", async (req, res) => {
-  const { name, surname, phone, password } = req.body;
+  const { name, surname, email, password } = req.body;
+  const cleanEmail = email?.trim().toLowerCase();
 
-  if (!name || !surname || !phone || !password) {
+  if (!name || !surname || !cleanEmail || !password) {
     return res.status(400).json({ message: "Tüm alanlar zorunludur." });
   }
 
+  if (!emailRegex.test(cleanEmail)) {
+    return res.status(400).json({ message: "Geçerli bir email adresi girin." });
+  }
+
   try {
-    const existingUser = await User.findOne({ phone });
+    const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser) {
       return res
         .status(400)
-        .json({ message: "Bu telefon numarasıyla kayıtlı bir hesap mevcut." });
+        .json({ message: "Bu email adresiyle kayıtlı bir hesap mevcut." });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const newUser = new User({ name, surname, phone, passwordHash });
+    const newUser = new User({ name, surname, email: cleanEmail, passwordHash });
     await newUser.save();
 
     res.status(201).json({ message: "Kullanıcı başarıyla kaydedildi" });
@@ -62,22 +68,26 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   console.log("login endpointine post isteğinde bulunuldu");
 
-  const phone = req.body.phone?.trim();
+  const email = req.body.email?.trim().toLowerCase();
   const password = req.body.password;
 
-  if (!phone || !password) {
+  if (!email || !password) {
     return res
       .status(400)
-      .json({ message: "Telefon numarası veya şifre gerekli." });
+      .json({ message: "Email adresi veya şifre gerekli." });
+  }
+
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: "Geçerli bir email adresi girin." });
   }
 
   try {
-    const user = await User.findOne({ phone: phone });
+    const user = await User.findOne({ email });
 
     if (!user) {
       return res
         .status(401)
-        .json({ message: "Telefon numarası veya şifre hatalı." });
+        .json({ message: "Email adresi veya şifre hatalı." });
     }
 
     if ((user.role || "user") === "vet") {
@@ -90,7 +100,7 @@ router.post("/login", async (req, res) => {
     if (!passwordMatch) {
       return res
         .status(401)
-        .json({ message: "Telefon numarası veya şifre hatalı." });
+        .json({ message: "Email adresi veya şifre hatalı." });
     }
 
     const token = signTokenForUser(user);
@@ -177,26 +187,31 @@ router.get("/profile", auth, async (req, res) => {
 
 router.put("/profile", auth, async (req, res) => {
   try {
-    const { name, surname, phone } = req.body;
+    const { name, surname, email } = req.body;
+    const cleanEmail = email?.trim().toLowerCase();
 
-    if (!name || !surname || !phone) {
+    if (!name || !surname || !cleanEmail) {
       return res.status(400).json({ message: "Tüm alanlar zorunludur." });
     }
 
-    const existingWithPhone = await User.findOne({
-      phone,
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ message: "Geçerli bir email adresi girin." });
+    }
+
+    const existingWithEmail = await User.findOne({
+      email: cleanEmail,
       _id: { $ne: req.user.id },
     });
 
-    if (existingWithPhone) {
+    if (existingWithEmail) {
       return res
         .status(400)
-        .json({ message: "Bu telefon numarası başka bir kullanıcıya ait." });
+        .json({ message: "Bu email adresi başka bir kullanıcıya ait." });
     }
 
     const updated = await User.findByIdAndUpdate(
       req.user.id,
-      { name, surname, phone },
+      { name, surname, email: cleanEmail },
       { new: true } 
     );
 
