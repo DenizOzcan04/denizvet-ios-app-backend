@@ -83,7 +83,7 @@ router.get("/vet", auth, async (req, res) => {
     }
 
     const appointments = await Appointment.find({ vet: req.user.id })
-      .populate("user", "name surname phone")
+      .populate("user", "name surname email phone")
       .sort({ date: 1, time: 1 });
 
     res.status(200).json(appointments);
@@ -107,7 +107,8 @@ router.get("/clinic", auth, vetMiddleware, async (req, res) => {
     }
 
     const appointments = await Appointment.find({ clinic: clinicId })
-      .populate("user", "name surname phone")
+      .populate("user", "name surname email phone")
+      .populate("clinic", "name address city")
       .sort({ date: 1, time: 1 });
 
     res.status(200).json(appointments);
@@ -187,7 +188,7 @@ router.get("/", auth, async (req, res) => {
     }
 
     const appointments = await Appointment.find()
-      .populate("user", "name surname phone")
+      .populate("user", "name surname email phone")
       .populate("clinic", "name address")
       .sort({ date: 1, time: 1 });
 
