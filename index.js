@@ -8,6 +8,7 @@ import authRoutes from "./routes/auth.js";
 import appointmentRoutes from "./routes/appointment.js";
 import clinicRoutes from "./routes/clinic.js";
 import blogRoutes from "./routes/blog.js";
+import askVetRoutes from "./routes/askVet.js";
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/clinics", clinicRoutes);
 app.use("/api/blogs", blogRoutes);
+app.use("/api/ask-vet", askVetRoutes);
 
 app.get("/health", (req, res) => res.status(200).json({ ok: true }));
 
@@ -62,4 +64,3 @@ async function start() {
 }
 
 start();
-
