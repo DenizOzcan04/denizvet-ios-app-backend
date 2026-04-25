@@ -5,6 +5,10 @@ import vetMiddleware from "../middleware/vetMiddleware.js";
 
 const router = express.Router();
 
+function buildAppointmentDate(date, time) {
+  return new Date(`${date}T${time}:00+03:00`);
+}
+
 // Randevu oluşturma
 router.post("/", auth, async (req, res) => {
   console.log("APPOINTMENT BODY:", req.body);
@@ -149,6 +153,48 @@ router.put("/:id/status", auth, vetMiddleware, async (req, res) => {
     res
       .status(500)
       .json({ message: "Randevu güncellenirken bir hata oluştu." });
+  }
+});
+
+router.put("/:id/cancel-by-clinic", auth, vetMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const appointment = await Appointment.findById(id);
+
+    if (!appointment) {
+      return res.status(404).json({ message: "Randevu bulunamadı." });
+    }
+
+    if (String(appointment.clinic) !== String(req.user.clinic)) {
+      return res.status(403).json({ message: "Bu randevuyu iptal etme yetkiniz yok." });
+    }
+
+    if (appointment.status === "cancelled") {
+      return res.status(400).json({ message: "Randevu zaten iptal edilmis." });
+    }
+
+    const appointmentDate = buildAppointmentDate(appointment.date, appointment.time);
+    const diffMs = appointmentDate.getTime() - Date.now();
+
+    if (Number.isNaN(appointmentDate.getTime()) || diffMs <= 0) {
+      return res.status(400).json({ message: "Gecmis randevular iptal edilemez." });
+    }
+
+    if (diffMs <= 2 * 60 * 60 * 1000) {
+      return res.status(400).json({ message: "Randevuya 2 saatten az kala iptal edilemez." });
+    }
+
+    appointment.status = "cancelled";
+    await appointment.save();
+
+    return res.status(200).json({
+      message: "Randevu klinik tarafindan iptal edildi.",
+      appointment,
+    });
+  } catch (error) {
+    console.log("Klinik randevu iptal hatasi:", error);
+    return res.status(500).json({ message: "Randevu iptal edilirken bir hata olustu." });
   }
 });
 
