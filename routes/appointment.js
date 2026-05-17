@@ -9,6 +9,12 @@ function buildAppointmentDate(date, time) {
   return new Date(`${date}T${time}:00+03:00`);
 }
 
+function isPastSlot(date, time) {
+  const appointmentDate = buildAppointmentDate(date, time);
+  if (Number.isNaN(appointmentDate.getTime())) return false;
+  return appointmentDate.getTime() <= Date.now();
+}
+
 // Randevu oluşturma
 router.post("/", auth, async (req, res) => {
   console.log("APPOINTMENT BODY:", req.body);
@@ -22,10 +28,17 @@ router.post("/", auth, async (req, res) => {
   }
 
   try {
+    if (isPastSlot(date, time)) {
+      return res.status(400).json({
+        message: "Gecmis saatler icin randevu olusturulamaz.",
+      });
+    }
+
     const sameSlot = await Appointment.findOne({
       clinic: clinicId,
       date,
       time,
+      status: { $ne: "cancelled" },
     });
 
     if (sameSlot) {
@@ -57,6 +70,34 @@ router.post("/", auth, async (req, res) => {
     res
       .status(500)
       .json({ message: "Randevu oluşturulurken bir hata oluştu." });
+  }
+});
+
+router.get("/availability", auth, async (req, res) => {
+  const { clinicId, date } = req.query;
+
+  if (!clinicId || !date) {
+    return res.status(400).json({ message: "clinicId ve date zorunludur." });
+  }
+
+  try {
+    const appointments = await Appointment.find({
+      clinic: clinicId,
+      date,
+      status: { $ne: "cancelled" },
+    })
+      .select("time")
+      .lean();
+
+    const bookedTimes = appointments
+      .map((appointment) => appointment.time)
+      .filter(Boolean)
+      .sort();
+
+    return res.status(200).json({ bookedTimes });
+  } catch (error) {
+    console.log("Randevu musaitlik hatasi:", error);
+    return res.status(500).json({ message: "Musaitlik bilgisi alinamadi." });
   }
 });
 
