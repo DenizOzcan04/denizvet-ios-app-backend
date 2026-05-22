@@ -8,8 +8,13 @@ export function AuthProvider({ children }) {
   );
 
   const [user, setUser] = React.useState(() => {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      localStorage.removeItem("user");
+      return null;
+    }
   });
 
   const [loading, setLoading] = React.useState(false);
@@ -24,24 +29,44 @@ export function AuthProvider({ children }) {
     else localStorage.removeItem("user");
   }, [user]);
 
-  const login = async (phone, password) => {
+  React.useEffect(() => {
+    if (!token) return;
+
+    const role = user?.role;
+    if (role === "admin" || role === "vet") return;
+
+    setToken("");
+    setUser(null);
+  }, [token, user]);
+
+  const login = async (loginType, identifier, password) => {
     setLoading(true);
     try {
-      const { data } = await http.post("/api/auth/admin/login", {
-        phone,
-        password,
-      });
+      const isVetLogin = loginType === "vet";
+      const endpoint = isVetLogin ? "/api/auth/vet/login" : "/api/auth/admin/login";
+      const payload = isVetLogin
+        ? { username: identifier, password }
+        : { phone: identifier, password };
 
-      if ((data?.user?.role || "user") !== "admin") {
+      const { data } = await http.post(endpoint, payload);
+      const role = data?.user?.role || "user";
+
+      if (!isVetLogin && role !== "admin") {
         setToken("");
         setUser(null);
         return { ok: false, message: "Bu panele erişim yetkiniz yok." };
       }
 
+      if (isVetLogin && role !== "vet") {
+        setToken("");
+        setUser(null);
+        return { ok: false, message: "Bu hesap klinik paneline erişim için yetkili değil." };
+      }
+
       setToken(data?.token || "");
       setUser(data?.user || null);
 
-      return { ok: true };
+      return { ok: true, role };
     } catch (e) {
       const msg = e?.response?.data?.message || "Login başarısız.";
       return { ok: false, message: msg };
@@ -64,6 +89,7 @@ export function AuthProvider({ children }) {
       logout,
       isAuthed: !!token,
       isAdmin: user?.role === "admin",
+      isVet: user?.role === "vet",
     }),
     [token, user, loading]
   );

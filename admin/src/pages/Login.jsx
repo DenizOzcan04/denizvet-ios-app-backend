@@ -1,25 +1,52 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 
 import newLogo from "../assets/newLogo.png";
 
 export default function Login() {
-  const { login, loading } = useAuth();
+  const { login, loading, isAuthed, user, logout } = useAuth();
   const nav = useNavigate();
 
-  const [phone, setPhone] = useState("");
+  const [loginType, setLoginType] = useState("admin");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!isAuthed) return;
+
+    if (user?.role === "admin") {
+      nav("/", { replace: true });
+      return;
+    }
+
+    if (user?.role === "vet") {
+      nav("/clinic", { replace: true });
+      return;
+    }
+
+    logout();
+  }, [isAuthed, user, nav, logout]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setErr("");
 
-    const res = await login(phone, password);
+    const res = await login(loginType, identifier, password);
     if (!res.ok) return setErr(res.message);
 
-    nav("/", { replace: true });
+    if (res.role === "admin") {
+      nav("/", { replace: true });
+      return;
+    }
+
+    if (res.role === "vet") {
+      nav("/clinic", { replace: true });
+      return;
+    }
+
+    setErr("Bu hesap web panel erişimi için uygun değil.");
   };
 
   return (
@@ -58,15 +85,46 @@ export default function Login() {
           <div className="authCard__top">
             <img className="authCard__logo" src={newLogo} alt="DenizVet Logo" />
             <div>
-              <h2 className="authCard__title">Admin Giriş</h2>
+              <h2 className="authCard__title">
+                {loginType === "admin" ? "Admin Giriş" : "Klinik Giriş"}
+              </h2>
               <p className="authCard__subtitle">
-                Telefon numaran ve şifrenle giriş yap.
+                {loginType === "admin"
+                  ? "Telefon numaran ve şifrenle giriş yap."
+                  : "Kullanıcı adı ve şifrenle klinik paneline giriş yap."}
               </p>
             </div>
           </div>
 
+          <div className="loginTypeSwitch" role="tablist" aria-label="Giriş Türü">
+            <button
+              type="button"
+              className={`loginTypeSwitch__button ${loginType === "admin" ? "is-active" : ""}`}
+              onClick={() => {
+                setLoginType("admin");
+                setIdentifier("");
+                setErr("");
+              }}
+            >
+              Admin Girişi
+            </button>
+            <button
+              type="button"
+              className={`loginTypeSwitch__button ${loginType === "vet" ? "is-active" : ""}`}
+              onClick={() => {
+                setLoginType("vet");
+                setIdentifier("");
+                setErr("");
+              }}
+            >
+              Klinik Girişi
+            </button>
+          </div>
+
           <div className="field">
-            <label className="field__label">Telefon</label>
+            <label className="field__label">
+              {loginType === "admin" ? "Telefon" : "Kullanıcı Adı"}
+            </label>
             <div className="field__control">
               <span className="field__icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -84,12 +142,12 @@ export default function Login() {
                 </svg>
               </span>
               <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="5555555555"
+                type={loginType === "admin" ? "tel" : "text"}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder={loginType === "admin" ? "5555555555" : "Kullanıcı adınız"}
                 autoComplete="username"
-                inputMode="numeric"
+                inputMode={loginType === "admin" ? "numeric" : "text"}
                 required
               />
             </div>

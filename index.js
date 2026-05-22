@@ -2,13 +2,16 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
+import { createServer } from "node:http";
 
 import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
 import appointmentRoutes from "./routes/appointment.js";
 import clinicRoutes from "./routes/clinic.js";
+import clinicSlotRoutes from "./routes/clinicSlots.js";
 import blogRoutes from "./routes/blog.js";
 import askVetRoutes from "./routes/askVet.js";
+import { initSocket } from "./services/socketServer.js";
 
 dotenv.config();
 
@@ -16,6 +19,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "http://localhost:3000",
   "https://denizozcan.net",
   "https://www.denizozcan.net",
@@ -41,6 +45,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/clinics", clinicRoutes);
+app.use("/api/clinic-slots", clinicSlotRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/ask-vet", askVetRoutes);
 
@@ -56,7 +61,11 @@ async function start() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("Veritabanına başarıyla bağlanıldı");
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`Server http://localhost:${PORT}`));
+    const server = createServer(app);
+
+    initSocket(server, allowedOrigins);
+
+    server.listen(PORT, () => console.log(`Server http://localhost:${PORT}`));
   } catch (err) {
     console.log("Veritabanına bağlanırken hata oluştu");
     process.exit(1);

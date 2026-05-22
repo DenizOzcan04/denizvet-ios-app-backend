@@ -328,6 +328,86 @@ input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid 
   background: rgba(15, 23, 42, .35);
 }
 
+.loginTypeSwitch{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 6px 0 4px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .06);
+}
+
+.loginTypeSwitch__button{
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(15, 23, 42, .66);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, transform .15s ease;
+}
+
+.loginTypeSwitch__button.is-active{
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+}
+
+.guardPage{
+  min-height: 100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 24px;
+  background: #f6f7fb;
+}
+
+.guardCard{
+  width: min(460px, 100%);
+  background: #fff;
+  border: 1px solid #ececf2;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.06);
+}
+
+.guardCard__title{
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.guardCard__text{
+  margin-top: 10px;
+  color: #4b5563;
+  line-height: 1.65;
+  font-size: 14px;
+}
+
+.placeholderCard{
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
+  border: 1px solid #e8e8ef;
+  border-radius: 22px;
+  padding: 24px;
+  box-shadow: 0 12px 26px rgba(0,0,0,.04);
+}
+
+.placeholderCard h2{
+  margin: 0 0 10px;
+  font-size: 24px;
+  color: #111827;
+}
+
+.placeholderCard p{
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #4b5563;
+}
+
 .auth.auth--full{
   display: block !important;
   padding: 0 !important;
@@ -1908,4 +1988,3 @@ input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid 
     white-space: normal;
   }
 }
-

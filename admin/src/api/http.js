@@ -1,7 +1,16 @@
 import axios from "axios";
 
+function normalizeApiBaseUrl(value) {
+  const raw = String(value || "").trim();
+
+  if (!raw) return "";
+
+  const trimmed = raw.replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed.slice(0, -4) : trimmed;
+}
+
 const http = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_API_URL),
 });
 
 http.interceptors.request.use((config) => {

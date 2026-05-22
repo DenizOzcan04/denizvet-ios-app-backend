@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App.jsx";
 import { AuthProvider } from "./auth/AuthProvider.jsx";
 import "./styles/admin.css";
+import "./styles/clinic.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

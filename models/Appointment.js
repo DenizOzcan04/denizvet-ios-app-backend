@@ -52,8 +52,24 @@ const appointmentSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "completed", "cancelled"],
+      enum: ["active", "completed", "cancelled", "cancel_requested"],
       default: "active",
+    },
+
+    cancelReason: {
+      type: String,
+      default: "",
+    },
+
+    cancelRequestedAt: {
+      type: Date,
+      default: null,
+    },
+
+    cancelRequestStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "rejected"],
+      default: "none",
     },
   },
   { timestamps: true }
