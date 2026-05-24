@@ -2,8 +2,18 @@ import express from "express";
 import Clinic from "../models/Clinic.js";
 import auth from "../middleware/authMiddleware.js";
 import adminMiddleware from "../middleware/adminMiddleware.js";
+import vetMiddleware from "../middleware/vetMiddleware.js";
+import { emitClinicUpdated } from "../services/socketServer.js";
 
 const router = express.Router();
+
+function sanitizeClinicProfilePayload(body = {}) {
+  return {
+    address: String(body.address || "").trim(),
+    phone: String(body.phone || "").trim(),
+    description: String(body.description || "").trim(),
+  };
+}
 
 router.post("/", auth, adminMiddleware, async (req, res) => {
   const { name, address, phone, city, description, avgRating, ratingCount } = req.body;
@@ -46,6 +56,66 @@ router.get("/", async (req, res) => {
   } catch (error) {
     console.log("Klinik listeleme hatası:", error);
     res.status(500).json({ message: "Sunucu hatası." });
+  }
+});
+
+router.get("/me", auth, vetMiddleware, async (req, res) => {
+  try {
+    const clinicId = req.user?.clinic;
+
+    if (!clinicId) {
+      return res.status(400).json({ message: "Kullanıcıya bağlı klinik bilgisi bulunamadı." });
+    }
+
+    const clinic = await Clinic.findById(clinicId);
+
+    if (!clinic) {
+      return res.status(404).json({ message: "Klinik bulunamadı." });
+    }
+
+    return res.status(200).json(clinic);
+  } catch (error) {
+    console.log("Klinik profil getirme hatası:", error);
+    return res.status(500).json({ message: "Klinik bilgileri alınırken bir hata oluştu." });
+  }
+});
+
+router.put("/me", auth, vetMiddleware, async (req, res) => {
+  try {
+    const clinicId = req.user?.clinic;
+
+    if (!clinicId) {
+      return res.status(400).json({ message: "Kullanıcıya bağlı klinik bilgisi bulunamadı." });
+    }
+
+    const updates = sanitizeClinicProfilePayload(req.body);
+
+    const clinic = await Clinic.findByIdAndUpdate(
+      clinicId,
+      updates,
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!clinic) {
+      return res.status(404).json({ message: "Klinik bulunamadı." });
+    }
+
+    emitClinicUpdated(clinicId, {
+      clinicId: String(clinic._id),
+      updatedFields: updates,
+      clinic,
+    });
+
+    return res.status(200).json({
+      message: "Klinik bilgileri güncellendi.",
+      clinic,
+    });
+  } catch (error) {
+    console.log("Klinik profil güncelleme hatası:", error);
+    return res.status(500).json({ message: "Klinik bilgileri güncellenirken bir hata oluştu." });
   }
 });
 

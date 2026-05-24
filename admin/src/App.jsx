@@ -12,6 +12,7 @@ import ClinicAppointments from "./pages/ClinicAppointments";
 import ClinicCancelRequests from "./pages/ClinicCancelRequests";
 import ClinicHistory from "./pages/ClinicHistory";
 import ClinicSlots from "./pages/ClinicSlots";
+import ClinicProfile from "./pages/ClinicProfile";
 
 export default function App() {
   const { isAuthed, user } = useAuth();
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/clinic/cancel-requests" element={<ClinicCancelRequests />} />
         <Route path="/clinic/history" element={<ClinicHistory />} />
         <Route path="/clinic/slots" element={<ClinicSlots />} />
+        <Route path="/clinic/profile" element={<ClinicProfile />} />
       </Route>
 
       <Route path="*" element={<Navigate to={fallbackPath} replace />} />

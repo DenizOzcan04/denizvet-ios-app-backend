@@ -48,6 +48,13 @@ export default function ClinicSidebar() {
         >
           Slot Yönetimi
         </NavLink>
+
+        <NavLink
+          to="/clinic/profile"
+          className={({ isActive }) => `navLink clinic-nav-link ${isActive ? "active clinic-active" : ""}`}
+        >
+          Klinik Bilgilerim
+        </NavLink>
       </nav>
     </aside>
   );

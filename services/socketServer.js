@@ -102,6 +102,11 @@ export function emitClinicSlotUpdated(clinicId, payload) {
   ioInstance.to(clinicRoomName(clinicId)).emit("slot:updated", payload);
 }
 
+export function emitClinicUpdated(clinicId, payload) {
+  if (!ioInstance || !clinicId || !payload) return;
+  ioInstance.to(clinicRoomName(clinicId)).emit("clinic:updated", payload);
+}
+
 export function getIO() {
   return ioInstance;
 }
