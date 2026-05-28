@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import Blogs from "./pages/Blogs";
 import Clinics from "./pages/Clinics";
 import Appointments from "./pages/Appointments";
+import Products from "./pages/Products";
 import ClinicDashboard from "./pages/ClinicDashboard";
 import ClinicAppointments from "./pages/ClinicAppointments";
 import ClinicCancelRequests from "./pages/ClinicCancelRequests";
@@ -28,6 +29,8 @@ export default function App() {
         <Route path="/blogs" element={<Blogs />} />
         <Route path="/clinics" element={<Clinics />} />
         <Route path="/appointments" element={<Appointments />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/admin/products" element={<Products />} />
       </Route>
 
       <Route element={<ProtectedRoute allowedRoles={["vet"]} />}>

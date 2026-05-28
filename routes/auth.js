@@ -66,8 +66,6 @@ router.post("/signup", async (req, res) => {
 
 
 router.post("/login", async (req, res) => {
-  console.log("login endpointine post isteğinde bulunuldu");
-
   const email = req.body.email?.trim().toLowerCase();
   const password = req.body.password;
 
@@ -164,11 +162,7 @@ router.get("/protected", auth, (req, res) => {
 
 router.get("/profile", auth, async (req, res) => {
   try {
-    console.log("Profile route, req.user:", req.user);
-
     const user = await User.findById(req.user.id);
-
-    console.log("Profile route, bulunan user:", user);
 
     if (!user) {
       return res.status(404).json({ message: "Kullanıcı bulunamadı." });

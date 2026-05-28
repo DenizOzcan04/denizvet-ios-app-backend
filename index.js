@@ -4,13 +4,15 @@ import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
 
-import User from "./models/User.js";
 import authRoutes from "./routes/auth.js";
 import appointmentRoutes from "./routes/appointment.js";
 import clinicRoutes from "./routes/clinic.js";
 import clinicSlotRoutes from "./routes/clinicSlots.js";
 import blogRoutes from "./routes/blog.js";
 import askVetRoutes from "./routes/askVet.js";
+import productRoutes from "./routes/product.js";
+import orderRoutes from "./routes/order.js";
+import { orderStripeWebhookHandler } from "./routes/order.js";
 import { initSocket } from "./services/socketServer.js";
 
 dotenv.config();
@@ -40,6 +42,12 @@ app.use(
 
 app.options(/.*/, cors());
 
+app.post(
+  "/api/orders/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  orderStripeWebhookHandler
+);
+
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
@@ -48,13 +56,10 @@ app.use("/api/clinics", clinicRoutes);
 app.use("/api/clinic-slots", clinicSlotRoutes);
 app.use("/api/blogs", blogRoutes);
 app.use("/api/ask-vet", askVetRoutes);
+app.use("/api/products", productRoutes);
+app.use("/api/orders", orderRoutes);
 
 app.get("/health", (req, res) => res.status(200).json({ ok: true }));
-
-app.get("/api/_test/users", async (req, res) => {
-  const users = await User.find().limit(10);
-  res.json(users);
-});
 
 async function start() {
   try {

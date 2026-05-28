@@ -41,6 +41,13 @@ export default function Sidebar() {
         >
           Randevular
         </NavLink>
+
+        <NavLink
+          to="/admin/products"
+          className={({ isActive }) => `navLink ${isActive ? "active" : ""}`}
+        >
+          Ürünler
+        </NavLink>
       </nav>
     </aside>
   );

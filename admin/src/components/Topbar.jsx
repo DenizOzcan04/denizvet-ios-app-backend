@@ -27,6 +27,12 @@ function getPageMeta(pathname) {
       desc: "Tüm randevuları görüntüleyebilir ve hatalı kayıtları silebilirsin.",
     };
   }
+  if (pathname.startsWith("/products") || pathname.startsWith("/admin/products")) {
+    return {
+      page: "Ürünler",
+      desc: "Petshop ürünlerini ekleyebilir, düzenleyebilir ve aktifliklerini yönetebilirsin.",
+    };
+  }
   return { page: "Admin", desc: "Yönetim ekranı" };
 }
 

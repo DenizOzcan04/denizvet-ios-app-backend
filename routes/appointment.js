@@ -27,6 +27,11 @@ function clinicIdValue(clinic) {
   return clinic._id ? String(clinic._id) : String(clinic);
 }
 
+function userIdValue(user) {
+  if (!user) return null;
+  return user._id ? String(user._id) : String(user);
+}
+
 function buildAppointmentDate(date, time) {
   return new Date(`${date}T${time}:00+03:00`);
 }
@@ -57,6 +62,22 @@ async function loadRealtimeAppointment(appointmentId) {
     .populate("user", "name surname email phone")
     .populate("clinic", "name address city")
     .lean();
+}
+
+function buildRealtimeAppointmentPayload(appointment) {
+  if (!appointment) return null;
+
+  return {
+    ...appointment,
+    appointmentId: appointment._id ? String(appointment._id) : null,
+    userId: userIdValue(appointment.user),
+    clinicId: clinicIdValue(appointment.clinic),
+    status: appointment.status || "",
+    cancelRequestStatus: appointment.cancelRequestStatus || "",
+    date: appointment.date || "",
+    time: appointment.time || "",
+    appointment,
+  };
 }
 
 async function getSlotAvailability({ clinicId, date }) {
@@ -134,8 +155,6 @@ function buildAppointmentMailHtml({ title, intro, clinicName, date, time, petNam
 
 // Randevu oluşturma
 router.post("/", auth, async (req, res) => {
-  console.log("APPOINTMENT BODY:", req.body);
-  console.log("USER FROM TOKEN:", req.user);
   const { petType, petName, serviceType, clinicId, date, time, notes } = req.body;
 
   if (!petType || !petName || !serviceType || !clinicId || !date || !time) {
@@ -198,8 +217,11 @@ router.post("/", auth, async (req, res) => {
     await appointment.save();
 
     const realtimeAppointment = await loadRealtimeAppointment(appointment._id);
+    const realtimePayload = buildRealtimeAppointmentPayload(realtimeAppointment);
+    const appointmentClinicId = clinicIdValue(realtimeAppointment?.clinic) || clinicId;
+    const appointmentUserId = userIdValue(realtimeAppointment?.user) || String(req.user.id);
 
-    emitClinicAppointmentCreated(clinicId, realtimeAppointment);
+    emitClinicAppointmentCreated(appointmentClinicId, appointmentUserId, realtimePayload);
 
     await sendMailSafely(
       {
@@ -379,9 +401,17 @@ router.put("/:id/status", auth, vetMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Randevu bulunamadı." });
     }
 
+    const realtimeAppointment = await loadRealtimeAppointment(appointment._id);
+    const realtimePayload = buildRealtimeAppointmentPayload(realtimeAppointment);
+    const resolvedClinicId =
+      clinicIdValue(realtimeAppointment?.clinic) || clinicIdValue(existingAppointment.clinic);
+    const appointmentUserId = userIdValue(realtimeAppointment?.user) || userIdValue(appointment.user);
+
+    emitClinicAppointmentUpdated(resolvedClinicId, appointmentUserId, realtimePayload);
+
     res.status(200).json({
       message: "Randevu durumu güncellendi.",
-      appointment,
+      appointment: realtimePayload,
     });
   } catch (error) {
     console.log("Randevu durumu güncelleme hatası:", error);
@@ -498,15 +528,21 @@ router.post("/:id/cancel-request", auth, async (req, res) => {
     ]);
 
     const realtimeAppointment = await loadRealtimeAppointment(appointment._id);
+    const realtimePayload = buildRealtimeAppointmentPayload(realtimeAppointment);
     const resolvedClinicId =
       clinicIdValue(realtimeAppointment?.clinic) || clinicIdValue(appointment.clinic);
+    const appointmentUserId = userIdValue(realtimeAppointment?.user) || String(req.user.id);
 
-    emitClinicAppointmentCancelRequested(resolvedClinicId, realtimeAppointment);
-    emitClinicAppointmentUpdated(resolvedClinicId, realtimeAppointment);
+    emitClinicAppointmentCancelRequested(
+      resolvedClinicId,
+      appointmentUserId,
+      realtimePayload
+    );
+    emitClinicAppointmentUpdated(resolvedClinicId, appointmentUserId, realtimePayload);
 
     return res.status(200).json({
       message: "İptal talebiniz kliniğe iletildi.",
-      appointment: realtimeAppointment,
+      appointment: realtimePayload,
     });
   } catch (error) {
     console.log("Randevu iptal talebi hatasi:", error);
@@ -541,8 +577,11 @@ router.put("/:id/approve-cancel-request", auth, vetMiddleware, async (req, res) 
     await appointment.save();
 
     const realtimeAppointment = await loadRealtimeAppointment(appointment._id);
+    const realtimePayload = buildRealtimeAppointmentPayload(realtimeAppointment);
     const resolvedClinicId =
       clinicIdValue(realtimeAppointment?.clinic) || clinicIdValue(appointment.clinic);
+    const appointmentUserId =
+      userIdValue(realtimeAppointment?.user) || userIdValue(appointment.user);
 
     await createNotification({
       userId: appointment.user?._id,
@@ -572,12 +611,16 @@ router.put("/:id/approve-cancel-request", auth, vetMiddleware, async (req, res) 
       "iptal onay maili"
     );
 
-    emitClinicAppointmentCancelApproved(resolvedClinicId, realtimeAppointment);
-    emitClinicAppointmentUpdated(resolvedClinicId, realtimeAppointment);
+    emitClinicAppointmentCancelApproved(
+      resolvedClinicId,
+      appointmentUserId,
+      realtimePayload
+    );
+    emitClinicAppointmentUpdated(resolvedClinicId, appointmentUserId, realtimePayload);
 
     return res.status(200).json({
       message: "İptal talebi onaylandı ve randevu iptal edildi.",
-      appointment: realtimeAppointment,
+      appointment: realtimePayload,
     });
   } catch (error) {
     console.log("Iptal talebi onaylama hatasi:", error);
@@ -612,8 +655,11 @@ router.put("/:id/reject-cancel-request", auth, vetMiddleware, async (req, res) =
     await appointment.save();
 
     const realtimeAppointment = await loadRealtimeAppointment(appointment._id);
+    const realtimePayload = buildRealtimeAppointmentPayload(realtimeAppointment);
     const resolvedClinicId =
       clinicIdValue(realtimeAppointment?.clinic) || clinicIdValue(appointment.clinic);
+    const appointmentUserId =
+      userIdValue(realtimeAppointment?.user) || userIdValue(appointment.user);
 
     await createNotification({
       userId: appointment.user?._id,
@@ -643,12 +689,16 @@ router.put("/:id/reject-cancel-request", auth, vetMiddleware, async (req, res) =
       "iptal red maili"
     );
 
-    emitClinicAppointmentCancelRejected(resolvedClinicId, realtimeAppointment);
-    emitClinicAppointmentUpdated(resolvedClinicId, realtimeAppointment);
+    emitClinicAppointmentCancelRejected(
+      resolvedClinicId,
+      appointmentUserId,
+      realtimePayload
+    );
+    emitClinicAppointmentUpdated(resolvedClinicId, appointmentUserId, realtimePayload);
 
     return res.status(200).json({
       message: "İptal talebi reddedildi ve randevu aktif duruma alındı.",
-      appointment: realtimeAppointment,
+      appointment: realtimePayload,
     });
   } catch (error) {
     console.log("Iptal talebi reddetme hatasi:", error);
