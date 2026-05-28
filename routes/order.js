@@ -28,6 +28,25 @@ function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function getStripeEventIds(order) {
+  return Array.isArray(order?.stripeEventIds) ? order.stripeEventIds : [];
+}
+
+function hasProcessedStripeEvent(order, eventId) {
+  return Boolean(eventId) && getStripeEventIds(order).includes(eventId);
+}
+
+function appendStripeEventId(order, eventId) {
+  if (!eventId) {
+    return;
+  }
+
+  const eventIds = getStripeEventIds(order);
+  if (!eventIds.includes(eventId)) {
+    order.stripeEventIds = [...eventIds, eventId];
+  }
+}
+
 function normalizeItems(items = []) {
   const merged = new Map();
 
@@ -191,33 +210,65 @@ async function decreaseOrderStockOnce(order) {
 }
 
 async function handlePaymentIntentSucceeded(paymentIntent, event) {
+  const paymentIntentId = String(paymentIntent?.id || "").trim();
+  const metadataOrderId = String(paymentIntent?.metadata?.orderId || "").trim();
   const order = await findOrderForPaymentIntent(paymentIntent);
+
+  console.log(
+    "[stripe-webhook] payment_intent.succeeded:start",
+    JSON.stringify({
+      paymentIntentId,
+      metadataOrderIdPresent: Boolean(metadataOrderId),
+      orderFound: Boolean(order),
+    })
+  );
+
   if (!order) {
     return;
   }
 
-  if (order.stripeEventIds.includes(event.id) || (order.paymentStatus === "paid" && order.stockDecreased)) {
+  if (hasProcessedStripeEvent(order, event.id) || (order.paymentStatus === "paid" && order.stockDecreased)) {
+    console.log(
+      "[stripe-webhook] payment_intent.succeeded:skip",
+      JSON.stringify({
+        paymentIntentId,
+        orderId: order._id.toString(),
+        paymentStatus: order.paymentStatus,
+        stockDecreased: Boolean(order.stockDecreased),
+        alreadyProcessedEvent: hasProcessedStripeEvent(order, event.id),
+      })
+    );
     return;
   }
 
   const expectedAmount = Math.round(order.totalAmount * 100);
   const receivedAmount = Number(paymentIntent.amount_received || paymentIntent.amount || 0);
 
+  console.log(
+    "[stripe-webhook] payment_intent.succeeded:amount-check",
+    JSON.stringify({
+      paymentIntentId,
+      orderId: order._id.toString(),
+      expectedAmount,
+      stripeAmount: receivedAmount,
+      stockDecreased: Boolean(order.stockDecreased),
+      itemCount: Array.isArray(order.items) ? order.items.length : 0,
+    })
+  );
+
   if (expectedAmount !== receivedAmount) {
     order.paymentStatus = "failed";
     order.paymentFailureReason = "Odeme tutari siparis toplami ile eslesmedi.";
-    if (!order.stripeEventIds.includes(event.id)) {
-      order.stripeEventIds.push(event.id);
-    }
+    appendStripeEventId(order, event.id);
     if (!order.stripePaymentIntentId) {
-      order.stripePaymentIntentId = String(paymentIntent.id || "");
+      order.stripePaymentIntentId = paymentIntentId;
     }
     await order.save();
     return;
   }
 
   if (!order.stripePaymentIntentId) {
-    order.stripePaymentIntentId = String(paymentIntent.id || "");
+    order.stripePaymentIntentId = paymentIntentId;
   }
 
   order.paymentStatus = "paid";
@@ -230,31 +281,51 @@ async function handlePaymentIntentSucceeded(paymentIntent, event) {
     order.paymentFailureReason = stockResult.reason || "Stok dusurme sirasinda bir sorun olustu.";
   }
 
-  if (!order.stripeEventIds.includes(event.id)) {
-    order.stripeEventIds.push(event.id);
-  }
+  appendStripeEventId(order, event.id);
 
   await order.save();
+
+  console.log(
+    "[stripe-webhook] payment_intent.succeeded:done",
+    JSON.stringify({
+      paymentIntentId,
+      orderId: order._id.toString(),
+      paymentStatus: order.paymentStatus,
+      status: order.status,
+      stockDecreased: Boolean(order.stockDecreased),
+    })
+  );
 }
 
 async function handlePaymentIntentFailed(paymentIntent, event) {
+  const paymentIntentId = String(paymentIntent?.id || "").trim();
   const order = await findOrderForPaymentIntent(paymentIntent);
+
+  console.log(
+    "[stripe-webhook] payment_intent.payment_failed:start",
+    JSON.stringify({
+      paymentIntentId,
+      metadataOrderIdPresent: Boolean(String(paymentIntent?.metadata?.orderId || "").trim()),
+      orderFound: Boolean(order),
+    })
+  );
+
   if (!order) {
     return;
   }
 
-  if (order.stripeEventIds.includes(event.id)) {
+  if (hasProcessedStripeEvent(order, event.id)) {
     return;
   }
 
   if (!order.stripePaymentIntentId) {
-    order.stripePaymentIntentId = String(paymentIntent.id || "");
+    order.stripePaymentIntentId = paymentIntentId;
   }
 
   order.paymentStatus = "failed";
   order.paymentFailureReason =
     String(paymentIntent?.last_payment_error?.message || "").trim() || "Odeme basarisiz oldu.";
-  order.stripeEventIds.push(event.id);
+  appendStripeEventId(order, event.id);
   await order.save();
 }
 
@@ -277,6 +348,18 @@ export async function orderStripeWebhookHandler(req, res) {
   } catch (error) {
     return res.status(400).json({ message: "Gecersiz Stripe webhook imzasi." });
   }
+
+  console.log(
+    "[stripe-webhook] received",
+    JSON.stringify({
+      eventType: event.type,
+      eventId: event.id,
+      paymentIntentId: String(event?.data?.object?.id || "").trim(),
+      metadataOrderIdPresent: Boolean(
+        String(event?.data?.object?.metadata?.orderId || "").trim()
+      ),
+    })
+  );
 
   try {
     if (event.type === "payment_intent.succeeded") {
