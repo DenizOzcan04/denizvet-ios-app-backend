@@ -186,6 +186,19 @@ export function emitClinicUpdated(clinicId, payload) {
   debugSocketLog(`emitted clinic:updated to clinic room and user clients`, targetClinicRoom);
 }
 
+export function emitProductChanged(type, productId, updatedAt) {
+  if (!ioInstance || !type || !productId) return;
+
+  const payload = {
+    type,
+    productId: String(productId),
+    updatedAt: updatedAt ? new Date(updatedAt).toISOString() : new Date().toISOString(),
+  };
+
+  ioInstance.emit("product:changed", payload);
+  debugSocketLog(`Product realtime emitted: product:changed ${type} ${payload.productId}`);
+}
+
 export function getIO() {
   return ioInstance;
 }

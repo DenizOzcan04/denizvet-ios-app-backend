@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import auth from "../middleware/authMiddleware.js";
 import adminMiddleware from "../middleware/adminMiddleware.js";
+import { emitProductChanged } from "../services/socketServer.js";
 
 const router = express.Router();
 const animalTypes = ["cat", "dog", "bird", "fish", "general"];
@@ -208,6 +209,7 @@ router.post("/", auth, adminMiddleware, async (req, res) => {
 
   try {
     const product = await Product.create(sanitized.payload);
+    emitProductChanged("created", product._id, product.updatedAt);
     return res.status(201).json({ message: "Ürün oluşturuldu.", product });
   } catch (error) {
     console.error("Product create error:", error);
@@ -235,6 +237,7 @@ router.put("/:id", auth, adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Ürün bulunamadı." });
     }
 
+    emitProductChanged("updated", product._id, product.updatedAt);
     return res.status(200).json({ message: "Ürün güncellendi.", product });
   } catch (error) {
     console.error("Product update error:", error);
@@ -263,6 +266,7 @@ router.patch("/:id/status", auth, adminMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Ürün bulunamadı." });
     }
 
+    emitProductChanged("status_changed", product._id, product.updatedAt);
     return res.status(200).json({ message: "Ürün durumu güncellendi.", product });
   } catch (error) {
     console.error("Product status update error:", error);
